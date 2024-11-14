@@ -1,0 +1,21 @@
+[
+    { "command": "start-judgement" },
+    { "command": "append-message", "message": "will be added to the judgement" },
+    { "command": "annotate-code", "row": 3, "column": 4, "text": "some info on the fourth line, fifth column of the source" },
+    { "command": "start-tab", "title": "Tab One" },
+    { "command": "start-context" },
+    { "command": "start-testcase", "description": "case 1" },
+    { "command": "start-test", "expected": "SOMETHING" },
+    { "command": "append-message", "message": "some more info about the test" },
+    { "command": "close-test", "generated": "SOMETHING", "status": { "enum": "correct", "human": "Correct" } },
+    { "command": "close-testcase" },
+    { "command": "close-context" },
+    { "command": "start-context" },
+    { "command": "start-testcase", "description": "case 2" },
+    { "command": "start-test", "expected": "SOMETHING" },
+    { "command": "close-test", "generated": "ELSE", "status": { "enum": "wrong", "human": "Wrong" } },
+    { "command": "close-testcase" },
+    { "command": "close-context" },
+    { "command": "close-tab" },
+    { "command": "close-judgement" }
+]

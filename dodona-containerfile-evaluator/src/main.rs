@@ -44,6 +44,10 @@ fn main() -> io::Result<()> {
 fn analyze(containerfile: File, config: Config) {
     let parsed = Dockerfile::from_reader(containerfile).expect("");
     if let Some(stage) = parsed.iter_stages().last() {
+        if let Some(base_image) = config.from {
+            test_from_instruction(&stage, &base_image);
+        }
+
         if let Some(user) = config.user {
             test_misc_instruction(&stage, "USER", &user);
         }
@@ -54,32 +58,67 @@ fn analyze(containerfile: File, config: Config) {
     }
 }
 
+fn test_from_instruction(stage: &Stage, expected: &config::From) {
+    cmd(Command::StartContext { description: None });
+    cmd(Command::StartTestcase {
+        description: Message::String("FROM instruction".to_owned()),
+    });
+
+    if let Some(from) = stage.instructions.iter().filter_map(|x| x.as_from()).last() {
+        string_cmp_test(&expected.image, Some(&from.image_parsed.image), "image");
+
+        if let Some(expected_tag) = &expected.tag {
+            string_cmp_test(&expected_tag, from.image_parsed.tag.as_deref(), "image tag")
+        }
+        if let Some(expected_hash) = &expected.hash {
+            string_cmp_test(&expected_hash, from.image_parsed.hash.as_deref(), "image hash")
+        }
+        cmd(Command::CloseTestcase { accepted: None });
+    }
+    else {
+        cmd(Command::CloseTestcase { accepted: Some(false) });
+    }
+
+    cmd(Command::CloseContext { accepted: None });
+}
+
 fn test_misc_instruction(stage: &Stage, name: &str, argument: &str) {
     cmd(Command::StartContext { description: None });
     cmd(Command::StartTestcase {
         description: Message::String(format!("{} instruction", name)),
     });
+
+    string_cmp_test(
+        argument,
+        get_content_from_misc_instruction(&stage.instructions, name).as_deref().map(|x| x.trim()),
+        name);
+
+    cmd(Command::CloseTestcase { accepted: None });
+    cmd(Command::CloseContext { accepted: None });
+}
+
+fn string_cmp_test(expected: &str, value: Option<&str>, name: &str) {
     cmd(Command::StartTest {
-        expected: argument.to_owned(),
+        expected: expected.to_owned(),
         format: None,
         description: None,
         channel: None,
     });
-    if let Some(content) = get_content_from_misc_instruction(&stage.instructions, name) {
-        let content = content.trim();
-        let status = if content != argument {
-            Status {
-                r#enum: StatusEnum::Wrong,
-                human: format!("{} doesn't match requested \"{}\"", name, argument),
-            }
-        } else {
+    if let Some(value) = value {
+        let status = if expected == value {
             Status {
                 r#enum: StatusEnum::Correct,
                 human: "Correct".to_owned(),
             }
+        } else {
+            Status {
+                r#enum: StatusEnum::Wrong,
+                human: format!("{} doesn't match requested \"{}\"", name, expected),
+            }
         };
+
         cmd(Command::CloseTest {
-            generated: content.to_owned(),
+            generated: value.to_owned(),
             accepted: None,
             status,
         });
@@ -93,8 +132,6 @@ fn test_misc_instruction(stage: &Stage, name: &str, argument: &str) {
             },
         });
     }
-    cmd(Command::CloseTestcase { accepted: None });
-    cmd(Command::CloseContext { accepted: None });
 }
 
 fn get_content_from_misc_instruction(instructions: &[&Instruction], name: &str) -> Option<String> {

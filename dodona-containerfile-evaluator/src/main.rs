@@ -59,27 +59,34 @@ fn analyze(containerfile: File, config: Config) {
 }
 
 fn test_from_instruction(stage: &Stage, expected: &config::From) {
-    cmd(Command::StartContext { description: None });
-    cmd(Command::StartTestcase {
-        description: Message::String("FROM instruction".to_owned()),
-    });
+    cmd(Command::StartContext { description: Some(Message::String("FROM instruction".to_owned())) });
 
     if let Some(from) = stage.instructions.iter().filter_map(|x| x.as_from()).last() {
+        cmd(Command::StartTestcase {
+            description: Message::String("image".to_owned()),
+        });
         string_cmp_test(&expected.image, Some(&from.image_parsed.image), "image");
+        cmd(Command::CloseTestcase { accepted: None });
 
         if let Some(expected_tag) = &expected.tag {
-            string_cmp_test(&expected_tag, from.image_parsed.tag.as_deref(), "image tag")
+            cmd(Command::StartTestcase {
+                description: Message::String("tag".to_owned()),
+            });
+            string_cmp_test(&expected_tag, from.image_parsed.tag.as_deref(), "image tag");
+            cmd(Command::CloseTestcase { accepted: None });
         }
         if let Some(expected_hash) = &expected.hash {
-            string_cmp_test(&expected_hash, from.image_parsed.hash.as_deref(), "image hash")
+            cmd(Command::StartTestcase {
+                description: Message::String("digest".to_owned()),
+            });
+            string_cmp_test(&expected_hash, from.image_parsed.hash.as_deref(), "image hash");
+            cmd(Command::CloseTestcase { accepted: None });
         }
-        cmd(Command::CloseTestcase { accepted: None });
+        cmd(Command::CloseContext { accepted: None });
     }
     else {
-        cmd(Command::CloseTestcase { accepted: Some(false) });
+        cmd(Command::CloseContext { accepted: Some(false) });
     }
-
-    cmd(Command::CloseContext { accepted: None });
 }
 
 fn test_misc_instruction(stage: &Stage, name: &str, argument: &str) {

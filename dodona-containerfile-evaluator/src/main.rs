@@ -43,6 +43,45 @@ fn main() -> io::Result<()> {
 
 fn analyze(containerfile: File, config: Config) {
     let parsed = Dockerfile::from_reader(containerfile).expect("");
+
+    if let Some(comments) = config.comments {
+        cmd(Command::StartContext { description: None });
+        cmd(Command::StartTestcase {
+            description: Message::String("Comments".to_owned()),
+        });
+        for comment in comments {
+            cmd(Command::StartTest {
+                expected: comment.to_owned(),
+                format: None,
+                description: None,
+                channel: None,
+            });
+
+            if parsed.comments.iter().any(|x| x.contains(&comment)) {
+                cmd(Command::CloseTest {
+                    generated: comment.to_owned(),
+                    accepted: None,
+                    status: Status {
+                        r#enum: StatusEnum::Correct,
+                        human: "Correct".to_owned(),
+                    },
+                });
+            } else {
+                cmd(Command::CloseTest {
+                    generated: "".to_owned(),
+                    accepted: None,
+                    status: Status {
+                        r#enum: StatusEnum::Wrong,
+                        human: format!("No comment found containing \"{}\"", &comment),
+                    },
+                });
+            };
+        }
+
+        cmd(Command::CloseTestcase { accepted: None });
+        cmd(Command::CloseContext { accepted: None });
+    }
+
     if let Some(stage) = parsed.iter_stages().last() {
         if let Some(base_image) = config.from {
             test_from_instruction(&stage, &base_image);

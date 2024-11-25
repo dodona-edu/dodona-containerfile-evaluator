@@ -5,7 +5,7 @@ edition = "2021"
 license = "MIT"
 
 [dependencies]
-dockerfile-parser = "0.9"
+dockerfile-parser = { path = "../../dockerfile-parser-rs" }
 dodona = { path = "../dodona" }
 serde_json = "1.0"
 

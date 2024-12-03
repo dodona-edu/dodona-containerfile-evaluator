@@ -195,6 +195,7 @@ dependencies = [
 [[package]]
 name = "dockerfile-parser"
 version = "0.1.0"
+source = "git+https://github.com/Bond-009/dockerfile-parser-rs.git?branch=comments#09f5bcd5e591260ac8d41a7477e8836d98262d93"
 dependencies = [
  "enquote",
  "pest",

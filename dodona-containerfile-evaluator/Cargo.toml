@@ -5,7 +5,7 @@ edition = "2021"
 license = "MIT"
 
 [dependencies]
-dockerfile-parser = { git = "https://github.com/Bond-009/dockerfile-parser-rs.git", branch="comments" }
+dockerfile-parser = { git = "https://github.com/Bond-009/dockerfile-parser-rs.git", branch="dev" }
 dodona = { path = "../dodona" }
 serde_json = "1.0"
 

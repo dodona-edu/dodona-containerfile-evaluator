@@ -1,0 +1,6 @@
+check-instruction = Checking { $instruction } instruction
+instruction-not-found = { $instruction } instruction not found
+argument-does-not-match = argument doesn't match requested { $value }
+check-image = Checking base image
+check-tag = Checking base image tag
+check-digest = Checking base image digest

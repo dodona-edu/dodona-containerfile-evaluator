@@ -10,6 +10,8 @@ use std::{
 use clap::*;
 use dockerfile_parser::*;
 use dodona::{Command, Message, Status, StatusEnum};
+use fluent::{FluentArgs, FluentBundle, FluentResource, FluentValue};
+use unic_langid::LanguageIdentifier;
 
 use self::config::Config;
 
@@ -28,6 +30,10 @@ fn main() -> io::Result<()> {
             arg!(<Containerfile> "Containerfile to operate on")
                 .value_parser(value_parser!(PathBuf)),
         )
+        .arg(
+            arg!(--language <language> "Containerfile to operate on")
+                .default_value("en"),
+        )
         .get_matches();
 
     let config_path = matches.get_one::<PathBuf>("config").expect("config is required");
@@ -37,9 +43,33 @@ fn main() -> io::Result<()> {
     let containerfile_path = matches.get_one::<PathBuf>("Containerfile").expect("containerfile is required");
     let containerfile = File::open(containerfile_path)?;
 
+    let bundle = fluent(matches.get_one::<String>("language").expect("language should have a default value"));
+
+
+
     analyze(containerfile, config);
 
     Ok(())
+}
+
+fn fluent(lang: &str) -> FluentBundle<FluentResource> {
+    let res_str = if lang.eq_ignore_ascii_case("nl") {
+        include_str!("../resources/nl.flt")
+    } else {
+        include_str!("../resources/en.flt")
+    };
+
+    let res = FluentResource::try_new(res_str.to_owned())
+        .expect("Failed to parse an FTL string.");
+
+    let langid: LanguageIdentifier = "en".parse().expect("Parsing failed");
+    let mut bundle = FluentBundle::new(vec![langid]);
+
+    bundle
+        .add_resource(res)
+        .expect("Failed to add FTL resources to the bundle.");
+
+    bundle
 }
 
 fn analyze(containerfile: File, config: Config) {
@@ -183,8 +213,15 @@ fn test_expose_instruction(stage: &Stage, expected: &[config::Port]) {
 
 fn test_misc_instruction(stage: &Stage, name: &str, argument: &str) {
     cmd(Command::StartContext { description: None });
+
+    let mut errors = vec![];
+    let mut args = FluentArgs::new();
+    args.set("instruction", FluentValue::from("TEST"));
+    let message = bundle.get_message("check-instruction").expect("resource bundle should contain key");
+    let pattern = message.value().expect("message should have value");
+
     cmd(Command::StartTestcase {
-        description: Message::String(format!("{} instruction", name)),
+        description: Message::String(bundle.format_pattern(pattern, Some(&args), &mut errors)),
     });
 
     cmp_test(

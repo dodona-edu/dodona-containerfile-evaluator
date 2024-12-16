@@ -1,0 +1,6 @@
+check-instruction = { $instruction } instructie controleren
+instruction-not-found = { $instruction } instructie niet gevonden
+argument-does-not-match = argument is niet hetzelfde alg het gevraagde { $value }
+check-image = Base image controleren
+check-tag = Base image tag controleren
+check-digest = Base image digest controleren

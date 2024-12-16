@@ -1,5 +1,6 @@
 mod config;
 
+use core::fmt;
 use std::{
     fs::{self, File},
     io,
@@ -94,6 +95,10 @@ fn analyze(containerfile: File, config: Config) {
         if let Some(workdir) = config.workdir {
             test_misc_instruction(&stage, "WORKDIR", &workdir);
         }
+
+        if let Some(expose) = config.expose {
+            test_expose_instruction(&stage, &expose);
+        }
     }
 }
 
@@ -104,21 +109,21 @@ fn test_from_instruction(stage: &Stage, expected: &config::From) {
         cmd(Command::StartTestcase {
             description: Message::String("image".to_owned()),
         });
-        string_cmp_test(&expected.image, Some(&from.image_parsed.image), "image");
+        cmp_test(&expected.image, Some(&from.image_parsed.image), "image");
         cmd(Command::CloseTestcase { accepted: None });
 
         if let Some(expected_tag) = &expected.tag {
             cmd(Command::StartTestcase {
                 description: Message::String("tag".to_owned()),
             });
-            string_cmp_test(&expected_tag, from.image_parsed.tag.as_deref(), "image tag");
+            cmp_test::<&str>(&expected_tag, from.image_parsed.tag.as_deref(), "image tag");
             cmd(Command::CloseTestcase { accepted: None });
         }
         if let Some(expected_hash) = &expected.hash {
             cmd(Command::StartTestcase {
                 description: Message::String("digest".to_owned()),
             });
-            string_cmp_test(&expected_hash, from.image_parsed.hash.as_deref(), "image hash");
+            cmp_test::<&str>(&expected_hash, from.image_parsed.hash.as_deref(), "image hash");
             cmd(Command::CloseTestcase { accepted: None });
         }
         cmd(Command::CloseContext { accepted: None });
@@ -128,13 +133,61 @@ fn test_from_instruction(stage: &Stage, expected: &config::From) {
     }
 }
 
+fn test_expose_instruction(stage: &Stage, expected: &[config::Port]) {
+    cmd(Command::StartContext { description: Some(Message::String("EXPOSE instruction".to_owned())) });
+    let expose_instructions: Vec<&ExposeInstruction> = stage.instructions.iter().filter_map(|x| x.as_expose()).collect();
+    for port in expected {
+        cmd(Command::StartTestcase {
+            description: Message::String(format!("{}/{}", port.number, port.protocol.as_deref().unwrap_or("tcp"))),
+        });
+        cmd(Command::StartTest {
+            expected: format!("{}", port.number),
+            format: None,
+            description: None,
+            channel: None,
+        });
+
+        if let Some(found_port) = expose_instructions.iter().find_map(|x| x.vars.iter().find(|x| x.port.content == port.number)) {
+            cmd(Command::CloseTest {
+                generated: format!("{}", port.number),
+                accepted: None,
+                status: Status {
+                    r#enum: StatusEnum::Correct,
+                    human: "Correct".to_owned(),
+                }
+            });
+            cmd(Command::CloseTestcase { accepted: None });
+
+            cmd(Command::StartTestcase {
+                description: Message::String("protocol".to_owned()),
+            });
+            cmp_test(port.protocol.as_deref().unwrap_or("tcp"), Some(found_port.protocol.as_ref().map_or("tcp", |x| &x.content)), "image tag");
+            cmd(Command::CloseTestcase { accepted: None });
+
+        }
+        else {
+            cmd(Command::CloseTest {
+                generated: "".to_owned(),
+                accepted: None,
+                status: Status {
+                    r#enum: StatusEnum::Wrong,
+                    human: "expose instruction not found".to_owned(),
+                },
+            });
+            cmd(Command::CloseTestcase { accepted: None });
+        }
+    }
+
+    cmd(Command::CloseContext { accepted: None });
+}
+
 fn test_misc_instruction(stage: &Stage, name: &str, argument: &str) {
     cmd(Command::StartContext { description: None });
     cmd(Command::StartTestcase {
         description: Message::String(format!("{} instruction", name)),
     });
 
-    string_cmp_test(
+    cmp_test(
         argument,
         get_content_from_misc_instruction(&stage.instructions, name).as_deref().map(|x| x.trim()),
         name);
@@ -143,9 +196,9 @@ fn test_misc_instruction(stage: &Stage, name: &str, argument: &str) {
     cmd(Command::CloseContext { accepted: None });
 }
 
-fn string_cmp_test(expected: &str, value: Option<&str>, name: &str) {
+fn cmp_test<T: fmt::Display + PartialEq>(expected: T, value: Option<T>, name: &str) {
     cmd(Command::StartTest {
-        expected: expected.to_owned(),
+        expected: format!("{}", expected),
         format: None,
         description: None,
         channel: None,
@@ -164,7 +217,7 @@ fn string_cmp_test(expected: &str, value: Option<&str>, name: &str) {
         };
 
         cmd(Command::CloseTest {
-            generated: value.to_owned(),
+            generated: format!("{}", value),
             accepted: None,
             status,
         });
